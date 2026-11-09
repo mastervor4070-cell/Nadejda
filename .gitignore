@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments / build
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Logs and runtime files
+*.log
+*.pid
+*.bak
+*.bak.*
+*.orig
+*.rej
+config.toml.new
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local test artifacts
+tests/_debug_engine.py

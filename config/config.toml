@@ -1,0 +1,308 @@
+# Nadejda — конфигурация по умолчанию.
+# Установленный файл лежит в /etc/nadejda/config.toml.
+# После изменения перезапустите: sudo nadejda restart
+
+[general]
+# Номер очереди NFQUEUE. Меняйте только если он занят другим приложением.
+queue_num = 200
+
+# Метка (fwmark), которой помечаются пакеты самого Nadejda, чтобы они
+# не попадали обратно в очередь. 0x4E414445 = "NADE".
+fwmark = 0x4E414445
+
+# "all"  — обрабатывать TLS на 443 ко всем адресам (максимальная совместимость).
+# "list" — только к адресам из встроенного списка домена (экономнее).
+scope = "all"
+
+# Разбирать SNI и трогать только ClientHello из списка хостов.
+# false — обрабатывать любой TLS на 443 (полезно при ECH / неизвестных SNI).
+sni_filter = true
+
+# Обрабатывать ClientHello без SNI (например, ECH). Обычно не требуется.
+desync_unknown = false
+
+# Что делать с QUIC (UDP/443). TCP-обход при этом работает всегда.
+#   "desync" — обходить QUIC фрагментацией IP (рекомендуется);
+#   "block"  — отклонять QUIC, чтобы приложения откатывались на TCP
+#              (старое поведение; голос/Discord на Cloudflare не трогается);
+#   "off"    — не вмешиваться в UDP/443.
+quic = "desync"
+
+# Устаревший синоним block_quic оставлен для совместимости со старыми
+# конфигами. Если задан quic, это значение игнорируется.
+# block_quic = "all"
+
+# Локальный DNS-прокси через DNS-over-TLS. Перехватывает порт 53 правилом
+# nftables, /etc/resolv.conf не изменяется.
+dns = true
+dns_port = 5353
+dns_upstreams = ["1.1.1.1", "8.8.8.8", "9.9.9.9"]
+dns_fallback_udp = true
+dns_cache_ttl = 3600
+# true — вырезать AAAA-ответы, чтобы трафик шёл по IPv4.
+dns_strip_aaaa = false
+
+# Сбрасывать «мёртвые» TCP-соединения. Провайдер иногда молча выбрасывает
+# весь поток после ClientHello: сервер не подтверждает данные, клиент
+# переотправляет одни и те же байты с растущей задержкой и висит до
+# 15 минут. Nadejda замечает такие повторы и сбрасывает сокет, чтобы
+# приложение сразу открыло новое соединение и попробовало снова.
+stall_reset = true
+
+# Порты TCP, на которых Nadejda ищет TLS/HTTP. Как в zapret:
+# 80 — обычный HTTP, 443 — HTTPS, 2053/2083/2087/2096/8443 — Discord media.
+tcp_ports = [80, 443, 2053, 2083, 2087, 2096, 8443]
+
+# UDP-порты Discord для голоса и демонстрации экрана. Перед каждым
+# датаграмом отправляется поддельный пакет (fake), как в zapret.
+udp_voice_ports = ["19294-19344", "50000-50100"]
+
+# Сколько первых пакетов потока обрабатывать. Ограничение не даёт Python-
+# движку вставать на пути больших загрузок (аналог --dpi-desync-cutoff).
+# udp_cutoff относится к QUIC и игровому фильтру; голос Discord
+# обрабатывается всегда, без cutoff (как в general.bat zapret).
+tcp_cutoff = 4
+udp_cutoff = 6
+
+# Игровой фильтр, как Game Filter в zapret. По умолчанию выключен: включение
+# затрагивает все порты выше 1023 и может сломать приложения, которые
+# работают без обхода.
+#   "off" | "tcp" | "udp" | "all"
+game_filter = "off"
+game_tcp_ports = "1024-65535"
+game_udp_ports = "1024-65535"
+
+# Как часто обновлять IP-адреса хостов (секунды), актуально для scope="list".
+refresh_seconds = 900
+
+# debug | info | warning | error
+log_level = "info"
+
+[desync]
+# Готовая стратегия. Список: nadejda autotune --quick
+#   multisplit   — несколько разрезов ClientHello (по умолчанию: быстро и надёжно)
+#   seqovl568    — перекрытие последовательности (против DPI с реассемблингом)
+#   seqovl_sni   — то же, но разрез ровно в середине SNI
+#   split_sni    — простой разрез в середине SNI
+#   fake_split   — поддельный ClientHello с малым TTL + разрез
+#   fake_split_ttl6 / _ttl9 / _ttl12 — то же, но с большим TTL (если DPI дальше)
+#   fake_split_goodsum — подделка с правильной контрольной суммой
+#   fake_split_goodsum_ttl3_disorder — подделка TTL 3 + разрез + обратный порядок
+#   fake_seqovl  — подделка + перекрытие последовательности
+#   frag         — фрагментация IP
+#   frag_split   — фрагментация + разрез
+#   disorder     — сегменты отправляются в обратном порядке
+#
+# Профили, совместимые с zapret-discord-youtube (general.bat):
+#   zapret_general — multisplit, разрез после 1-го байта, перекрытие 568
+#                    байт настоящим ClientHello 4PDA (основной профиль)
+#   zapret_google  — то же с перекрытием 681 и ip-id=0 (Google, Discord media)
+#   zapret_discord — как zapret_google, без ip-id=0
+#   zapret_fake    — fake + seqovl, 6 повторов, как ALT-профиль zapret
+strategy = "zapret_general"
+
+# Где резать ClientHello: "1" (после первого байта), "sni", "sni_mid",
+# "sni_end", "half", "none" или список через запятую, например "1,sni_mid".
+# Обычно это задаётся выбранной стратегией; меняйте осознанно.
+positions = "1"
+
+# Перекрытие последовательности в байтах (0 — выключено).
+seqovl = 568
+
+# Чем заполнять перекрытие: "decoy" (сгенерированный ClientHello) или имя
+# готового блоба из zapret: "tls_4pda", "tls_google", "tls_sferum", "stun".
+seqovl_pattern = "tls_4pda"
+
+# Поддельный ClientHello перед настоящим.
+fake = false
+fake_ttl = 3
+fake_badsum = true
+repeat = 1
+
+# Готовый блоб для подделки: "", "tls_google", "stun", "quic_google" и т.д.
+fake_payload = ""
+
+# Обнулять IP ID (zapret: --ip-id=zero; полезно для Google/Discord).
+ip_id_zero = false
+
+# Сколько первых пакетов потока десинхронизировать (SYN не считается).
+cutoff = 4
+
+# Фрагментация первого сегмента на уровне IP.
+frag = false
+
+# Отправлять сегменты в обратном порядке.
+disorder = false
+
+# Пауза между сегментами, мс.
+gap_ms = 10.0
+
+# SNI в поддельном/декойном ClientHello. Домен должен быть таким, который
+# провайдер точно не троттлит; www.google.com — плохой выбор там, где
+# замедляют и Google/YouTube.
+fake_sni = "ya.ru"
+
+# Максимальный размер TCP-сегмента при разрезании.
+max_segment = 1400
+
+[udp]
+# Стратегия для QUIC (UDP/443). Работает вместе с TCP-стратегией выше.
+#   quic_frag          — разрезать QUIC Initial на IP-фрагменты (рекомендуется)
+#   quic_frag_early    — первый фрагмент короче (32 байта полезной нагрузки)
+#   quic_frag_mid      — первый фрагмент длиннее (128 байт)
+#   quic_frag_inorder  — фрагменты отправляются по порядку
+#   quic_off           — не трогать QUIC
+#   zapret_quic        — как zapret: поддельный QUIC Initial от www.google.com
+#                        перед настоящим (fake, 6 повторов)
+strategy = "quic_frag"
+
+# "frag" — резать QUIC Initial на IP-фрагменты (по умолчанию);
+# "fake" — отправлять поддельный пакет перед настоящим (режим zapret_quic);
+# "off"  — не трогать UDP/443.
+# Обычно задаётся выбранной стратегией.
+mode = "frag"
+
+# Сколько байт QUIC-полезной нагрузки оставить в первом фрагменте.
+# Меньше — агрессивнее для DPI, но выше риск, что сеть отбросит фрагменты.
+split = 64
+
+# Отправлять хвостовые фрагменты раньше первого: DPI, который не собирает
+# фрагменты, видит только «хвост» без начала QUIC-заголовка.
+disorder = true
+
+# Предел полезной нагрузки одного IP-фрагмента (кратно 8).
+max_fragment = 1400
+
+# --- Режим fake (zapret) --------------------------------------------------
+# Имя готового блоба из Zapret: quic_google, discord_udp, game_udp, stun.
+fake_payload = "quic_google"
+# 0 — оставить исходный TTL. Как в general.bat: TTL 3 может умереть раньше
+# DPI провайдера, а валидная контрольная сумма важна, потому что домашний
+# NAT с nf_conntrack_checksum=1 отбрасывает пакеты с битой суммой.
+fake_ttl = 0
+fake_badsum = false
+repeat = 6
+fake_gap_ms = 0.0
+
+# Голос и демонстрация экрана Discord (порты из general.udp_voice_ports).
+# Поддельный UDP-пакет отправляется перед каждым настоящим, независимо от
+# режима QUIC — иначе TURN/STUN на UDP/443 ломает демонстрацию экрана.
+# Блоб ACTIVE_DISCORD_UDP безопасен, даже если дойдёт до сервера Discord.
+voice_payload = "discord_udp"
+voice_ttl = 0
+voice_badsum = false
+voice_repeat = 3
+voice_gap_ms = 0.0
+
+# Домены, для которых QUIC принудительно отклоняется, чтобы приложение
+# сразу перешло на TCP. Нужно там, где провайдер режет UDP глубже, чем
+# помогает фрагментация (например, YouTube). TCP-обход при этом работает.
+force_tcp_domains = [
+    "youtube.com",
+    "youtu.be",
+    "youtube-nocookie.com",
+    "googlevideo.com",
+    "ytimg.com",
+    "gvt1.com",
+    "gvt2.com",
+    "googlesyndication.com",
+    "doubleclick.net",
+]
+
+[overrides]
+# Для отдельных доменов можно назначить другую TCP-стратегию. Ключ — домен,
+# он же покрывает все поддомены. Глобальная стратегия выше при этом не меняется.
+#
+# soundcloud.com сбрасывает соединение по SNI (RST до ServerHello), поэтому
+# для него нужна fake/seqovl-стратегия. Медиа-хосты SoundCloud
+# (*.soundcloud.cloud) и CDN sndcdn.com провайдер троттлит после рукопожатия —
+# поддельный ClientHello помогает и там.
+"soundcloud.com" = "fake_split_goodsum_ttl3_disorder"
+"soundcloud.cloud" = "fake_split_goodsum_ttl3_disorder"
+"sndcdn.com" = "fake_split_goodsum_ttl3_disorder"
+#
+# YouTube на проверенной сети режется по SNI: multisplit даёт 2-3 успешных
+# запроса из 8, а fake-стратегия — 8-12 из 8-12. CDN видео (googlevideo.com)
+# не переопределяем — он обычно идёт нормально через глобальную стратегию.
+"youtube.com" = "fake_split_goodsum_ttl3_disorder"
+"youtu.be" = "fake_split_goodsum_ttl3_disorder"
+#
+# Discord (Cloudflare). Голос и демонстрация экрана идут по UDP и этих правил
+# не касаются; здесь только TCP-страницы и CDN вложений, которые провайдер
+# тоже троттлит после рукопожатия.
+"discord.com" = "fake_split_goodsum_ttl3_disorder"
+"discordapp.com" = "fake_split_goodsum_ttl3_disorder"
+"discordapp.net" = "fake_split_goodsum_ttl3_disorder"
+"discordcdn.com" = "fake_split_goodsum_ttl3_disorder"
+"discord.media" = "fake_split_goodsum_ttl3_disorder"
+"discord.gg" = "fake_split_goodsum_ttl3_disorder"
+
+[hosts]
+# Дополнительные домены (точное имя или любой поддомен).
+extra_domains = []
+# Файл со списком доменов, по одной строке; # — комментарий.
+extra_file = ""
+# Домены, которые нужно исключить из обработки. Как list-exclude.txt в
+# zapret: банки, госуслуги, магазины, Steam/Epic/Riot и прочее, чей трафик
+# ломается от подмены ClientHello. Ключ покрывает все поддомены.
+exclude = [
+    # банки и платежи
+    "alfabank.ru",
+    "gazprombank.ru",
+    "psbank.ru",
+    "rosbank.ru",
+    "rshb.ru",
+    "sber.ru",
+    "sberbank.ru",
+    "tbank.ru",
+    "tinkoff.ru",
+    "vtb.ru",
+    "ozon.ru",
+    "wildberries.ru",
+    "wb.ru",
+    # государство
+    "gosuslugi.ru",
+    "nalog.ru",
+    "mos.ru",
+    # игры и лаунчеры (Game Filter в zapret их не трогает)
+    "steampowered.com",
+    "steamcommunity.com",
+    "steamusercontent.com",
+    "epicgames.com",
+    "epicgames.dev",
+    "unrealengine.com",
+    "riotgames.com",
+    "riotcdn.net",
+    "leagueoflegends.com",
+    "playvalorant.com",
+    "minecraft.net",
+    "xboxlive.com",
+    # обновления и магазины ПО
+    "microsoft.com",
+    "microsoftonline.com",
+    "live.com",
+    "sharepoint.com",
+    "nvidia.com",
+    "msi.com",
+    "marketplace.visualstudio.com",
+    "gallery.vsassets.io",
+    "gallerycdn.vsassets.io",
+    "libreoffice.org",
+    "documentfoundation.org",
+    "7-zip.org",
+    "filezilla-project.org",
+    "win-rar.com",
+    # сервисы, которые сами по себе не блокируются
+    "twitch.tv",
+    "pusher.com",
+    "yandex.ru",
+    "yandex.net",
+    "yandex.com",
+    "ya.ru",
+    "yastatic.net",
+    "vk.com",
+    "vk.ru",
+    "vk.me",
+    "ok.ru",
+    "mail.ru",
+]

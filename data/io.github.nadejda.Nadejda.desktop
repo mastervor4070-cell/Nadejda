@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Nadejda
+GenericName=DPI bypass
+Comment=Обход DPI для GitHub, YouTube, Spotify, SoundCloud и Discord
+Comment[en]=DPI bypass for GitHub, YouTube, Spotify, SoundCloud and Discord
+Exec=nadejda-gui %U
+TryExec=nadejda-gui
+Icon=nadejda
+Terminal=false
+Categories=Network;Utility;
+Keywords=DPI;VPN;proxy;zapret;nadejda;bypass;
+StartupNotify=true
+StartupWMClass=io.github.nadejda.Nadejda

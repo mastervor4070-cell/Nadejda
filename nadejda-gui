@@ -1,0 +1,3 @@
+#!/bin/sh
+# Launch the Nadejda GUI from a source checkout (no installation needed).
+exec python3 "$(dirname "$(readlink -f "$0")")/run.py" gui "$@"

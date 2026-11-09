@@ -1,0 +1,47 @@
+[Unit]
+Description=Nadejda - DPI desync (nftables + NFQUEUE)
+Documentation=file:/opt/nadejda/README.md
+After=network-online.target
+Wants=network-online.target
+# Не запускаемся, если ядро без netfilter.
+ConditionPathExists=/proc/net/netfilter
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nadejda --config /etc/nadejda/config.toml start --foreground
+ExecReload=/usr/local/bin/nadejda --config /etc/nadejda/config.toml restart
+ExecStop=/usr/local/bin/nadejda --config /etc/nadejda/config.toml stop
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+KillMode=mixed
+
+# Nadejda работает от root: ей нужны CAP_NET_ADMIN (nftables) и
+# CAP_NET_RAW (raw-сокеты для переинъекции пакетов).
+User=root
+Group=root
+
+RuntimeDirectory=nadejda
+RuntimeDirectoryMode=0755
+
+# Лог дополнительно пишется в /var/log/nadejda.log самим приложением;
+# journald получает stdout/stderr.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nadejda
+
+LimitNOFILE=65535
+Nice=-5
+
+# Минимально необходимые привилегии. Раскомментируйте вместе с
+# User=nobody и AmbientCapabilities, если не хотите запускать от root
+# (потребуется также доступ к /run/nadejda и /etc/nadejda).
+#CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+#AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+#NoNewPrivileges=true
+#ProtectSystem=strict
+#ProtectHome=true
+#PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
