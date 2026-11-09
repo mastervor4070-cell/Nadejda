@@ -8,6 +8,8 @@ zapret: свой движок на Python (только стандартная �
 Цель — вернуть доступ к **GitHub, YouTube, Spotify, SoundCloud, ChatGPT и Discord**
 на сетях, где провайдер фильтрует TLS по SNI, подменяет DNS и режет QUIC.
 
+<img src="data/nadejda-gui.png" alt="Главное окно Nadejda" width="760">
+
 ---
 
 ## Как это работает
