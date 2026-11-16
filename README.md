@@ -163,8 +163,17 @@ sudo nadejda stop-zapret --dry-run # только показать, что бу�
 ## Windows (WinDivert)
 
 Windows-версия использует тот же движок стратегий, но перехватывает пакеты
-через **WinDivert** вместо nftables/NFQUEUE. Ей нужны Windows 10/11 x64,
-Python 3.11+ и права администратора (драйвер WinDivert).
+через **WinDivert** вместо nftables/NFQUEUE.
+
+Готовая сборка без Python — в
+[последнем релизе](https://github.com/mastervor4070-cell/Nadejda/releases/latest):
+`Nadejda.exe` (графический интерфейс) и `nadejda-win.exe` (командная строка).
+Файлы не подписаны сертификатом разработчика, поэтому SmartScreen может
+предупредить: «Подробнее» → «Выполнить в любом случае». Конфиг при первом
+запуске создаётся в `C:\ProgramData\Nadejda\config.toml`.
+
+Вариант из исходников требует Windows 10/11 x64, Python 3.11+ и прав
+администратора (драйвер WinDivert).
 
 ```powershell
 # PowerShell от имени администратора, в папке репозитория

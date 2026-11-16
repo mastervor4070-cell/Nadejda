@@ -16,6 +16,7 @@ import json
 import logging
 import logging.handlers
 import os
+import shutil
 import signal
 import socket
 import struct
@@ -62,6 +63,37 @@ def default_config_path() -> Path:
     return ROOT / "config" / "config.toml"
 
 
+def bundled_config_path() -> Path | None:
+    """Default config shipped inside a PyInstaller executable."""
+    base = getattr(sys, "_MEIPASS", None)
+    if not base:
+        return None
+    candidate = Path(base) / "config" / "config.toml"
+    return candidate if candidate.is_file() else None
+
+
+def ensure_config() -> Path:
+    """Return the config path, installing the bundled default if needed.
+
+    The standalone .exe has no installer, so on the first run it copies the
+    shipped config to ``%ProgramData%/Nadejda/config.toml``.  The exe is
+    elevated (requireAdministrator), so the write is allowed.
+    """
+    target = default_config_path()
+    if target.is_file():
+        return target
+    bundled = bundled_config_path()
+    if bundled is None:
+        return target
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(bundled, target)
+        log.info("installed default configuration at %s", target)
+    except OSError:
+        log.warning("cannot create default configuration at %s", target, exc_info=True)
+    return target
+
+
 def _pid_path() -> Path:
     return state_dir() / "nadejda.pid"
 
@@ -75,7 +107,7 @@ def _log_path() -> Path:
 
 
 def load_config(path: str | Path | None) -> configmod.Config:
-    target = Path(path) if path else default_config_path()
+    target = Path(path) if path else ensure_config()
     if not target.is_file():
         raise SystemExit(
             f"config not found: {target}\n"
@@ -464,7 +496,7 @@ def cmd_test(args) -> int:
 
 
 def cmd_doctor(args) -> int:
-    cfg_path = Path(args.config) if args.config else default_config_path()
+    cfg_path = Path(args.config) if args.config else ensure_config()
     print(f"Nadejda {__version__} for Windows")
     print(f"  python      : {sys.version.split()[0]} ({sys.executable})")
     print(f"  platform    : {sys.platform}")
@@ -493,7 +525,7 @@ def cmd_gui(args) -> int:
 
 
 def cmd_config(args) -> int:
-    cfg_path = Path(args.config) if args.config else default_config_path()
+    cfg_path = Path(args.config) if args.config else ensure_config()
     print(cfg_path)
     return 0
 

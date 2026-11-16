@@ -323,7 +323,7 @@ class App:
 
 
 def main(config_path: str | Path | None = None) -> int:
-    path = Path(config_path) if config_path else cli.default_config_path()
+    path = Path(config_path) if config_path else cli.ensure_config()
     if not path.is_file():
         root = tk.Tk()
         root.withdraw()

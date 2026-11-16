@@ -21,7 +21,27 @@ Windows-версия Nadejda обходит DPI тем же способом, ч
 - Права администратора — WinDivert устанавливает драйвер и перехватывает
   пакеты только с повышенными правами.
 
-## Установка
+## Готовый .exe (без Python)
+
+В [релизах](https://github.com/mastervor4070-cell/Nadejda/releases/latest)
+лежат самодостаточные сборки `Nadejda.exe` (GUI) и `nadejda-win.exe` (CLI):
+Python, tkinter и pydivert уже внутри. Скачайте
+`Nadejda-1.1.1-windows-x64.zip`, распакуйте и запустите `Nadejda.exe`
+(Windows запросит UAC). Конфиг при первом запуске создаётся в
+`C:\ProgramData\Nadejda\config.toml`.
+
+SmartScreen может предупредить, что файл не подписан: «Подробнее» →
+«Выполнить в любом случае». Антивирус иногда ругается на драйвер WinDivert —
+он подписан и используется zapret/GoodbyeDPI; добавьте папку в исключения,
+если нужно.
+
+Автозапуск без UAC:
+
+```powershell
+schtasks /Create /TN Nadejda /TR "C:\Nadejda\Nadejda.exe" /SC ONLOGON /RL HIGHEST /F
+```
+
+## Установка из исходников
 
 Откройте PowerShell **от имени администратора** в папке репозитория:
 
