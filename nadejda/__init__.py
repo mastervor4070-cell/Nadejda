@@ -1,3 +1,3 @@
-"""Nadejda - transparent DPI desynchronisation for Linux."""
+"""Nadejda - transparent DPI desynchronisation for Linux and Windows."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

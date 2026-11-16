@@ -1,9 +1,10 @@
 # Nadejda
 
-**Nadejda** — обход DPI-блокировок на Linux. Это самостоятельная реализация в духе
-zapret: свой движок на Python (только стандартная библиотека), свой клиент NFQUEUE
-поверх netlink и собственные стратегии рассинхронизации TCP **и UDP/QUIC**. Это
-**не** обёртка над `nfqws` и не требует `libnetfilter_queue`.
+**Nadejda** — обход DPI-блокировок на Linux **и Windows**. Это самостоятельная
+реализация в духе zapret: свой движок на Python (только стандартная библиотека),
+свои стратегии рассинхронизации TCP **и UDP/QUIC**. На Linux перехват идёт через
+nftables + NFQUEUE (свой клиент поверх netlink, без `libnetfilter_queue`), на
+Windows — через WinDivert. Это **не** обёртка над `nfqws`/`winws`.
 
 Цель — вернуть доступ к **GitHub, YouTube, Spotify, SoundCloud, ChatGPT и Discord**
 на сетях, где провайдер фильтрует TLS по SNI, подменяет DNS и режет QUIC.
@@ -156,6 +157,40 @@ sudo ./install.sh --uninstall    # удалить (конфиг сохраняе
 sudo nadejda stop-zapret           # остановить, отключить автозапуск, убрать nft
 sudo nadejda stop-zapret --dry-run # только показать, что будет сделано
 ```
+
+---
+
+## Windows (WinDivert)
+
+Windows-версия использует тот же движок стратегий, но перехватывает пакеты
+через **WinDivert** вместо nftables/NFQUEUE. Ей нужны Windows 10/11 x64,
+Python 3.11+ и права администратора (драйвер WinDivert).
+
+```powershell
+# PowerShell от имени администратора, в папке репозитория
+powershell -ExecutionPolicy Bypass -File windows\install.ps1
+```
+
+Установщик кладёт программу в `C:\ProgramData\Nadejda`, создаёт виртуальное
+окружение с `pydivert`, ставит команду `nadejda-win`, регистрирует задачу
+планировщика **Nadejda** (запуск при входе с правами администратора, без
+запроса UAC) и ярлыки в меню «Пуск».
+
+```powershell
+nadejda-win test                 # проверить фильтр и стратегии
+nadejda-win start                # запустить (терминал от администратора)
+schtasks /Run /TN Nadejda        # запустить без терминала и без UAC
+nadejda-win status               # счётчики
+nadejda-win stop
+nadejda-win gui                  # графический интерфейс
+```
+
+Конфиг: `C:\ProgramData\Nadejda\config.toml` — тот же формат `[general]`,
+`[desync]`, `[udp]`, `[overrides]`, что и на Linux. Отличия: нет DNS-прокси
+(системный резолвер не трогается), нет `stall_reset` (движок видит только
+исходящие пакеты) и нет `autotune` — пресеты перебираются вручную или в GUI.
+Подробности, диагностика и удаление — в
+[`windows/README.md`](windows/README.md).
 
 ---
 
@@ -651,6 +686,7 @@ make test
 python3 tests/config_test.py          # правка конфига без потери комментариев
 python3 tests/guard_test.py           # сброс «мёртвых» потоков и стартовая очистка
 python3 tests/zapret_test.py          # профили zapret, fake-UDP, голос, firewall
+python3 tests/win_engine_test.py      # Windows-движок на фейковом WinDivert
 unshare -Urn python3 tests/netns_nfq_smoke.py
 unshare -Urn python3 tests/netns_engine_test.py
 unshare -Urn python3 tests/netns_dns_test.py
@@ -665,6 +701,11 @@ unshare -Urn python3 tests/netns_dns_test.py
 неизменность STUN на UDP/443,
 правила nftables (порты, cutoff, Game Filter) и решения движка
 (исключения, overrides, cutoff, голос при `quic = "off"`).
+
+`tests/win_engine_test.py` проверяет Windows-порт без root и без Windows:
+фильтр WinDivert, перестройку ClientHello с сохранением всех байтов,
+реассемблинг разрезанного ClientHello, overrides, QUIC-фрагментацию,
+`quic = "block"`, голос Discord и переинъекцию необработанных пакетов.
 
 ---
 
@@ -697,12 +738,15 @@ nadejda/
   config.py     конфиг, встроенные списки, TOML
   cli.py        команды nadejda
   gui.py        графический интерфейс GTK4 / libadwaita
+  win/          Windows-порт: WinDivert, CLI, GUI на tkinter
 config/config.toml    конфиг по умолчанию
 data/nadejda.svg      иконка приложения
 data/io.github.nadejda.Nadejda.desktop  ярлык для меню
 systemd/nadejda.service
-install.sh
-tests/                тест конфига + интеграционные тесты в network namespace
+install.sh            установщик для Linux
+windows/              install.ps1, start-nadejda.cmd, README для Windows
+pyproject.toml        пакет и команда nadejda-win (нужна Windows-установщику)
+tests/                тесты конфига, движка (Linux и Windows) и network namespace
 ```
 
 ---

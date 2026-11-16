@@ -1,7 +1,7 @@
 PYTHON ?= python3
 UNSHARE ?= unshare
 
-.PHONY: all check test test-nfq test-engine test-dns test-config test-guard test-zapret install uninstall clean
+.PHONY: all check test test-nfq test-engine test-dns test-config test-guard test-zapret test-win install uninstall clean
 
 all: check
 
@@ -27,7 +27,10 @@ test-guard:
 test-zapret:
 	$(PYTHON) tests/zapret_test.py
 
-test: check test-config test-guard test-zapret test-nfq test-engine test-dns
+test-win:
+	$(PYTHON) tests/win_engine_test.py
+
+test: check test-config test-guard test-zapret test-win test-nfq test-engine test-dns
 	@echo "all tests passed"
 
 install:
